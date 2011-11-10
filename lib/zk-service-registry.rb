@@ -30,7 +30,7 @@ module ZK
     # a new service instance on zookeeper
     def self.advertise(svcname, hostport)
       zk_service.create(:path => ZK::ServicePath, :data => "service registry") if !zk_service.exists(:path => ZK::ServicePath)
-      zk_service.create(:path => ZK::ServicePath + "/#{svcname}", :data => "service") if !zk_service.exists(:path => ZK::ServicePath + "/#{svcname}")
+      zk_service.create(:path => ZK::ServicePath + "/#{svcname}", :data => svcname) if !zk_service.exists(:path => ZK::ServicePath + "/#{svcname}")
       if exists_service?(svcname, hostport) then
         delete_service(svcname, hostport)
       end
@@ -100,39 +100,60 @@ module ZK
   end
 
   class ServiceFinder
-    attr_accessor :nodes
+    @hosts = "localhost:2181"
 
-    def initialize(hosts="localhost:2181", &block)
-      @zk = ZooKeeper.new(:host => hosts, :watcher => self)
-      @nodes = []
+    attr_accessor :instances
+
+    def initialize
+      @instances = []
       @lock = Mutex.new
-      @watch_fn = block if block
     end
 
-    def find_service(svcname)
-      find(ZK::ServicePath + "/#{svcname}")
+    def self.find_and_watch(svcname)
+      service_finder = ServiceFinder.new
+
+      path = ZK::ServicePath + "/#{svcname}"
+      res = zk.children(:path => path, :watch => service_finder)
+
+      service_instances = res.collect do |svc_inst_name|
+        ret = zk.get(:path => path + "/" + svc_inst_name)
+
+        ZK::ServiceInstance.new(zk, svcname, svc_inst_name, ret[0])
+      end
+
+      service_finder.instances = service_instances
+      service_finder
+    end
+
+    def instances=(new_instances)
+      @lock.synchronize do
+        @instances = new_instances 
+      end
+    end
+
+    def instances
+      @lock.synchronize do
+        ret = @instances.clone
+      end
     end
 
     private
 
-    def find(path)
-      res = @zk.children(:path => path, :watch => true)
-      res = res.map do |c|
-        ret = @zk.get(:path => path + "/" + c)
-        { :service_host => c, :data => ret [0]}
-      end
-      @lock.synchronize do
-        @nodes = res
-      end
-      @nodes
+    def self.zk
+      @zk =@zk ||  ZooKeeper.new(:host => @hosts)
     end
 
-    # Event callback
+    # Event callback for Zookeeper events
     def process(e)
-      find(e.path) if e.type == 4
+      p e
+      # Something changed in Zookeepr so 
+      # refresh the service instances
+      if e.type == 4 then
+        new_service_finder = self.class.find_and_watch(e.data)
 
-      # call the custom watcher
-      @watch_fn.call(e) if @watch_fn
+        self.instances = new_service_finder.instances
+
+      end
     end
 
   end
