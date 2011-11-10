@@ -1,6 +1,4 @@
-require 'rubygems'
 require 'json'
-require File.dirname(__FILE__) + "/zk-service-registry/version"
 require File.dirname(__FILE__) + '/zk-service-registry/zookeeper'
 
 module ZK 

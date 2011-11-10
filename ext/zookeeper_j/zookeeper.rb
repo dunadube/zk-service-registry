@@ -2,6 +2,7 @@ include Java
 
 require File.dirname(__FILE__) + '/zookeeper-dev.jar'
 require File.dirname(__FILE__) + '/log4j-1.2.15.jar'
+Java::org.apache.log4j.Logger.getRootLogger().set_level(Java::org.apache.log4j.Level::OFF) # turn off nasty log4j messages
 require File.dirname(__FILE__) + '/extensions'
 
 class DefaultWatcher

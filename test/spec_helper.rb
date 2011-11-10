@@ -1,6 +1,4 @@
 # $LOAD_PATH << "#{File.dirname(__FILE__)}/../ext" << "#{File.dirname(__FILE__)}/../lib"
-require 'rubygems'
-require 'bundler/setup'
 require 'rspec'
 require 'rspec/autorun'
 require File.dirname(__FILE__) + "/../ext/zookeeper_j/zookeeper_test_server.rb"

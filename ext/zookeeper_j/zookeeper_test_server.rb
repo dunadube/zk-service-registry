@@ -8,14 +8,15 @@ class ZookeeperTestServer
 
   def self.start(background=true)
     set_log_level
-    FileUtils.remove_dir("/tmp/zookeeper", true)
-    FileUtils.mkdir_p("/tmp/zookeeper/server1/data")
+    data_dir = "#{ZKHOME}/data/localhost"
+    FileUtils.remove_dir(data_dir, true)
+    FileUtils.mkdir_p(data_dir)
     if background
       thread = Thread.new do
-        `#{ZKHOME}/bin/zkServer.sh start`
+        `cd #{ZKHOME} && #{ZKHOME}/bin/zkServer.sh start`
       end
     else
-      `#{ZKHOME}/bin/zkServer.sh start`
+      `cd #{ZKHOME} && #{ZKHOME}/bin/zkServer.sh start`
     end
   end
 
@@ -34,12 +35,12 @@ class ZookeeperTestServer
   end
 
   def self.stop
-    `#{ZKHOME}/bin/zkServer.sh stop`
+    `cd #{ZKHOME} && #{ZKHOME}/bin/zkServer.sh stop`
     FileUtils.remove_dir("/tmp/zookeeper", true)
   end
 
   def self.status
-    `#{ZKHOME}/bin/zkServer.sh status`
+    `cd #{ZKHOME} && #{ZKHOME}/bin/zkServer.sh status`
   end
   
   def self.set_log_level
