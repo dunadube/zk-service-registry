@@ -111,9 +111,10 @@ module ZK
 
     def self.find_and_watch(svcname)
       service_finder = ServiceFinder.new
+      zk = ZooKeeper.new(:host => @hosts, :watcher => service_finder)
 
       path = ZK::ServicePath + "/#{svcname}"
-      res = zk.children(:path => path, :watch => service_finder)
+      res = zk.children(:path => path, :watch => true)
 
       service_instances = res.collect do |svc_inst_name|
         ret = zk.get(:path => path + "/" + svc_inst_name)
@@ -145,14 +146,12 @@ module ZK
 
     # Event callback for Zookeeper events
     def process(e)
-      p e
       # Something changed in Zookeepr so 
       # refresh the service instances
-      if e.type == 4 then
-        new_service_finder = self.class.find_and_watch(e.data)
+      if e.type > 0 then
+        new_service_finder = self.class.find_and_watch(e.path.split("/").last)
 
         self.instances = new_service_finder.instances
-
       end
     end
 

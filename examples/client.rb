@@ -2,12 +2,11 @@ require 'rubygems'
 require 'net/http/persistent'
 require 'zk-service-registry'
 
-def lb_uri(svcname)
-  services = ZK::ServiceInstance.list_services
-  service = services.select do |s|
-    s.name == svcname 
-  end[0]
-  instance = service.instances.shuffle[0]
+@service_finder = ZK::ServiceFinder.find_and_watch("foo")
+
+def lb_uri
+  p @service_finder.instances
+  instance = @service_finder.instances.shuffle[0]
   URI "http://#{instance.name}"
 end
 
@@ -15,7 +14,7 @@ http = Net::HTTP::Persistent.new 'my_fancy_foo_client'
 (1..100).each do
   # perform a GET
   begin
-  response = http.request lb_uri("foo")
+  response = http.request lb_uri
   p response.body
   rescue Exception => e 
     puts e.message
