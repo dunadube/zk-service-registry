@@ -4,6 +4,15 @@ require File.dirname(__FILE__) + '/zk-service-registry/zookeeper'
 module ZK 
   ServicePath = "/services"
 
+  module Utils
+    def wait_until(timeout=10, &block)
+      time_to_stop = Time.now + timeout
+      until yield do 
+        break unless Time.now < time_to_stop
+      end
+    end
+  end
+
   class Service
     attr_accessor :name, :instances
 
@@ -14,6 +23,7 @@ module ZK
   end
 
   class ServiceInstance
+    include Utils
     @hosts = "localhost:2181"
 
     attr_accessor :service_name, :name, :data 
@@ -88,6 +98,8 @@ module ZK
 
     def self.zk_service
       @zk1 =@zk1 ||  ZooKeeper.new(:host => @hosts)
+      wait_until{ @zk1.connected? }
+      @zk1
     end
 
     def self.exists_service?(svcname, hostport)
@@ -100,6 +112,7 @@ module ZK
   end
 
   class ServiceFinder
+    include Utils
 
     attr_accessor :instances
 
@@ -111,6 +124,7 @@ module ZK
 
     def find_and_watch(svcname)
       @zk = @zk || ZooKeeper.new(:host => @hosts, :watcher => self)
+      wait_until { @zk.connected? }
 
       path = ZK::ServicePath + "/#{svcname}"
       res = @zk.children(:path => path, :watch => true)
@@ -145,7 +159,7 @@ module ZK
       begin
         _process(e)
       rescue Exception => e
-        puts "ERROR: " + e.backtrace.inspect
+        puts "ERROR: #{e.message} - " + e.backtrace
       end
     end
 
@@ -160,10 +174,8 @@ module ZK
       # Something changed in Zookeepr so 
       # refresh the service instances
       if e.type == 4 then
-        # p e.path.split("/").last
         find_and_watch(e.path.split("/").last) 
       else
-        # p e.path.split("/")[-2]
         find_and_watch(e.path.split("/")[-2]) 
       end
     end
