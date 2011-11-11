@@ -100,37 +100,38 @@ module ZK
   end
 
   class ServiceFinder
-    @hosts = "localhost:2181"
 
     attr_accessor :instances
 
-    def initialize
+    def initialize(hosts = "localhost:2181")
+      @hosts = hosts 
       @instances = []
       @lock = Mutex.new
     end
 
-    def self.find_and_watch(svcname)
-      service_finder = ServiceFinder.new
-      zk = ZooKeeper.new(:host => @hosts, :watcher => service_finder)
+    def find_and_watch(svcname)
+      @zk = @zk || ZooKeeper.new(:host => @hosts, :watcher => self)
 
       path = ZK::ServicePath + "/#{svcname}"
-      res = zk.children(:path => path, :watch => true)
+      res = @zk.children(:path => path, :watch => true)
 
       service_instances = res.collect do |svc_inst_name|
-        ret = zk.get(:path => path + "/" + svc_inst_name)
+        ret = @zk.get(:path => path + "/" + svc_inst_name, :watch => true)
 
-        ZK::ServiceInstance.new(zk, svcname, svc_inst_name, ret[0])
+        ZK::ServiceInstance.new(ZooKeeper.new(:host => @hosts), svcname, svc_inst_name, ret[0])
       end
 
-      service_finder.instances = service_instances
-      service_finder
-    end
-
-    def instances=(new_instances)
       @lock.synchronize do
-        @instances = new_instances 
+        @instances = service_instances
       end
+
     end
+
+    # def instances=(new_instances)
+    #   @lock.synchronize do
+    #     @instances = new_instances 
+    #   end
+    # end
 
     def instances
       @lock.synchronize do
@@ -140,18 +141,30 @@ module ZK
 
     private
 
-    def self.zk
-      @zk =@zk ||  ZooKeeper.new(:host => @hosts)
+    def process(e)
+      begin
+        _process(e)
+      rescue Exception => e
+        puts "ERROR: " + e.backtrace.inspect
+      end
     end
 
     # Event callback for Zookeeper events
-    def process(e)
+    # EventNodeCreated           = 1
+    # EventNodeDeleted           = 2
+    # EventNodeDataChanged       = 3
+    # EventNodeChildrenChanged   = 4
+    def _process(e)
+      return if e.type == -1
+
       # Something changed in Zookeepr so 
       # refresh the service instances
-      if e.type > 0 then
-        new_service_finder = self.class.find_and_watch(e.path.split("/").last)
-
-        self.instances = new_service_finder.instances
+      if e.type == 4 then
+        # p e.path.split("/").last
+        find_and_watch(e.path.split("/").last) 
+      else
+        # p e.path.split("/")[-2]
+        find_and_watch(e.path.split("/")[-2]) 
       end
     end
 
