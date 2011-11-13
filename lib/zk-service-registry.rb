@@ -23,7 +23,6 @@ module ZK
   end
 
   class ServiceInstance
-    include Utils
     @hosts = "localhost:2181"
 
     attr_accessor :service_name, :name, :data 
@@ -98,7 +97,9 @@ module ZK
 
     def self.zk_service
       @zk1 =@zk1 ||  ZooKeeper.new(:host => @hosts)
-      wait_until{ @zk1.connected? }
+      while !@zk1.connected?
+        sleep 1
+      end
       @zk1
     end
 
@@ -122,10 +123,13 @@ module ZK
       @lock = Mutex.new
     end
 
-    def find_and_watch(svcname)
+    def connect
       @zk = @zk || ZooKeeper.new(:host => @hosts, :watcher => self)
       wait_until { @zk.connected? }
+      self
+    end
 
+    def find_and_watch(svcname)
       path = ZK::ServicePath + "/#{svcname}"
       res = @zk.children(:path => path, :watch => true)
 
@@ -141,11 +145,13 @@ module ZK
 
     end
 
-    # def instances=(new_instances)
-    #   @lock.synchronize do
-    #     @instances = new_instances 
-    #   end
-    # end
+    def close
+      if @zk then
+        @zk.close
+        wait_until { @zk.closed? }
+        @zk = nil
+      end
+    end
 
     def instances
       @lock.synchronize do

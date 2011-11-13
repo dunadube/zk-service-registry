@@ -4,18 +4,6 @@ require 'rspec/autorun'
 require File.dirname(__FILE__) + "/../ext/zookeeper_j/zookeeper_test_server.rb"
 
 
-# RSpec.configure do |config|  
-#   config.before(:all) do
-#     ZookeeperTestServer.start
-#     wait_until { ZookeeperTestServer.running? }
-#   end
-# 
-#   config.after(:all) do
-#     ZookeeperTestServer.stop
-#     wait_until { !ZookeeperTestServer.running? }
-#   end
-# end
-
 # method to waith until block passed returns true or timeout (default is 10 seconds) is reached 
 def wait_until(timeout=10, &block)
   time_to_stop = Time.now + timeout

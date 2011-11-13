@@ -2,10 +2,10 @@ require 'rubygems'
 require 'net/http/persistent'
 require 'zk-service-registry'
 
-@service_finder = ZK::ServiceFinder.find_and_watch("foo")
+@service_finder = ZK::ServiceFinder.new.connect
+@service_finder.find_and_watch("foo")
 
 def lb_uri
-  p @service_finder.instances
   instance = @service_finder.instances.shuffle[0]
   URI "http://#{instance.name}"
 end
