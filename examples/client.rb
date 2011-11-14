@@ -3,7 +3,7 @@ require 'net/http/persistent'
 require 'zk-service-registry'
 
 @service_finder = ZK::ServiceFinder.new.connect
-@service_finder.find_and_watch("foo")
+@service_finder.watch("foo")
 
 def lb_uri
   instance = @service_finder.instances.shuffle[0]

@@ -112,6 +112,15 @@ module ZK
     end
   end
 
+  # Connect to zookeeper service registry 
+  # and watch for services coming online or
+  # going offline.
+  # Usage:
+  #     finder = ServiceFinder.new.connect
+  #     finder.watch("fooservice")
+  #     ... do something with finder.instances
+  #     finder.close
+  #
   class ServiceFinder
     include Utils
 
@@ -129,14 +138,14 @@ module ZK
       self
     end
 
-    def find_and_watch(svcname)
+    def watch(svcname)
       path = ZK::ServicePath + "/#{svcname}"
       res = @zk.children(:path => path, :watch => true)
 
       service_instances = res.collect do |svc_inst_name|
         ret = @zk.get(:path => path + "/" + svc_inst_name, :watch => true)
 
-        ZK::ServiceInstance.new(ZooKeeper.new(:host => @hosts), svcname, svc_inst_name, ret[0])
+        ZK::ServiceInstance.new(@zk, svcname, svc_inst_name, ret[0])
       end
 
       @lock.synchronize do
@@ -180,9 +189,9 @@ module ZK
       # Something changed in Zookeepr so 
       # refresh the service instances
       if e.type == 4 then
-        find_and_watch(e.path.split("/").last) 
+        watch(e.path.split("/").last) 
       else
-        find_and_watch(e.path.split("/")[-2]) 
+        watch(e.path.split("/")[-2]) 
       end
     end
 

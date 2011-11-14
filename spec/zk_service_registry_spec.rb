@@ -29,14 +29,14 @@ describe ZK::ServiceInstance do
   end
 
   it "can lookup a service/service instance" do
-    @service_finder.find_and_watch("online_status")
+    @service_finder.watch("online_status")
 
     @service_finder.instances.size.should eql(1)
     @service_finder.instances.first.name.should eql("host01:port1")
   end
 
   it "can watch for new service instances" do
-    @service_finder.find_and_watch("online_status")
+    @service_finder.watch("online_status")
     new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
 
     sleep 2
@@ -44,8 +44,9 @@ describe ZK::ServiceInstance do
   end
 
   it "can watch for removed  service instances" do
-    @service_finder.find_and_watch("online_status")
+    @service_finder.watch("online_status")
     new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
+    sleep 2
     new_instance.delete
     sleep 2
 
