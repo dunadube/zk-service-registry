@@ -76,7 +76,7 @@ module ZK
     # Remove the service instance from
     # zookeeper
     def delete
-        self.class.delete_service(@service_name, @name)
+      self.class.delete_service(@service_name, @name)
     end
 
     # Mark the service as down
@@ -174,7 +174,7 @@ module ZK
       begin
         _process(e)
       rescue Exception => e
-        puts "ERROR: #{e.message} - " + e.backtrace
+        puts("ERROR: #{e.message} - " + e.backtrace)
       end
     end
 
@@ -184,13 +184,15 @@ module ZK
     # EventNodeDataChanged       = 3
     # EventNodeChildrenChanged   = 4
     def _process(e)
-      return if e.type == -1
+      return if e.type == Java::org.apache.zookeeper::Watcher::Event::EventType::None
 
       # Something changed in Zookeepr so 
       # refresh the service instances
-      if e.type == 4 then
+      if e.type == Java::org.apache.zookeeper::Watcher::Event::EventType::NodeChildrenChanged then
+        # $LOG.debug("Children changed on " + e.path)
         watch(e.path.split("/").last) 
       else
+        # $LOG.debug("Node create/deleted on " + e.path)
         watch(e.path.split("/")[-2]) 
       end
     end

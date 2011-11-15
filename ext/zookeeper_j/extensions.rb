@@ -1,15 +1,15 @@
 module Zk
 
-  Stat = com.yahoo.zookeeper.data.Stat
+  Stat = org.apache.zookeeper.data.Stat
   class Stat
     def to_a
       [getCzxid, getMzxid, getCtime, getMtime, getVersion, getCversion, getAversion, getEphemeralOwner]
     end
   end
 
-  Id = com.yahoo.zookeeper.data.Id
+  Id = org.apache.zookeeper.data.Id
 
-  ACL = com.yahoo.zookeeper.data.ACL
+  ACL = org.apache.zookeeper.data.ACL
   class ACL
     
     def self.to_java(acl)
@@ -22,7 +22,7 @@ module Zk
 
   end
   
-  class WatcherEvent < com.yahoo.zookeeper.proto.WatcherEvent; end
+  class WatcherEvent < org.apache.zookeeper.proto.WatcherEvent; end
   
   module Watcher
     
@@ -34,8 +34,12 @@ module Zk
     end
     
     def process_with_conv(event)
-      process_without_conv(ZooKeeper::WatcherEvent.new(event.type, event.state, event.path))
+      process_without_conv(event)
     end
+
+    # def process_with_conv(event)
+    #   process_without_conv(ZooKeeper::WatcherEvent.new(event.type, event.state, event.path))
+    # end
   end
   
   module AsyncCallback

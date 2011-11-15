@@ -1,21 +1,28 @@
 include Java
 
-require File.dirname(__FILE__) + '/zookeeper-dev.jar'
-require File.dirname(__FILE__) + '/log4j-1.2.15.jar'
+require File.dirname(__FILE__) + '/zookeeper-3.3.3/zookeeper-3.3.3.jar'
+require File.dirname(__FILE__) + '/zookeeper-3.3.3/zookeeper-dev-ZooInspector.jar'
+require File.dirname(__FILE__) + '/zookeeper-3.3.3/lib/log4j-1.2.15.jar'
 Java::org.apache.log4j.Logger.getRootLogger().set_level(Java::org.apache.log4j.Level::OFF) # turn off nasty log4j messages
 require File.dirname(__FILE__) + '/extensions'
 
 class DefaultWatcher
-  import com.yahoo.zookeeper.Watcher
+  import org.apache.zookeeper.Watcher
   def process(event)
     puts "#{event.class} received --- with path = #{event.get_path} --- state = #{ZooKeeper::CONNECTION_STATES[event.get_state]} --- type = #{ZooKeeper::EVENT_TYPES[event.get_type]}"
   end
 end
 
-JZooKeeper = com.yahoo.zookeeper.ZooKeeper
-ZooDefs = com.yahoo.zookeeper.ZooDefs
+JZooKeeper = Java::org.apache.zookeeper.retry.ZooKeeperRetry
+# JZooKeeper = org.apache.zookeeper.ZooKeeper
+ZooDefs = Java::org.apache.zookeeper.ZooDefs
+CreateMode = Java::org.apache.zookeeper.CreateMode
 
 class ZooKeeper < JZooKeeper
+
+  DEFAULTS = {
+    :timeout => 10000
+  }
   
   # Initialize a new ZooKeeper Client.  Can be initialized with a string of the hosts names (see :host argument) otherwise pass a hash with arguments set.
   # 
@@ -134,20 +141,31 @@ class ZooKeeper < JZooKeeper
     path     = args[:path]
     data     = args[:data]
     acl      = args[:acl] || ZooKeeper::ACL::OPEN_ACL_UNSAFE
-    flags    = 0
-    flags    |= ZooDefs::CreateFlags::EPHEMERAL if args[:ephemeral]
-    flags    |= ZooDefs::CreateFlags::SEQUENCE  if args[:sequence]
+    # flags    = 0
+    # flags    |= ZooDefs::CreateFlags::EPHEMERAL if args[:ephemeral]
+    # flags    |= ZooDefs::CreateFlags::SEQUENCE  if args[:sequence]
     callback = args[:callback]
     context  = args[:context]
+
+    flags = CreateMode::PERSISTENT 
+    if args[:ephemeral] && args[:sequence] then
+      flags = CreateMode::EPHEMERAL_SEQUENTIAL 
+    elsif args[:sequence] then
+      flags = CreateMode::PERSISTENT_SEQUENTIAL 
+    elsif args[:ephemeral] then
+      flags = CreateMode::EPHEMERAL 
+    end
     
     if callback
       callback.extend Zk::AsyncCallback::StringCallback unless callback.is_a?(Proc) || callback.respond_to?(:processResult)
       super(path, data.to_java_bytes, acl.collect {|acl| Zk::ACL.to_java(acl)}, flags, callback, context)
     else
-      super(path, data.to_java_bytes, acl.collect {|acl| Zk::ACL.to_java(acl)}, flags)
+      acl_list = acl.collect {|acl| Zk::ACL.to_java(acl)}
+      createWithString(path, data, acl_list, flags)
+      # super(path, data.to_java_bytes, acl_list, flags)
     end
-  rescue Exception => e
-    raise KeeperException.by_code(e.code)
+  # rescue Exception => e
+  #   raise KeeperException.by_code(e.code)
   end
 
   # Return the data and stat of the node of the given path.  
@@ -197,8 +215,8 @@ class ZooKeeper < JZooKeeper
     else
       [String.from_java_bytes(getData(path, watch, stat)), Stat.new(stat.to_a)]
     end
-  rescue Exception => e
-    raise KeeperException.by_code(e.code)
+  # rescue Exception => e
+  #   raise KeeperException.create(e.code)
   end
   
   
@@ -303,8 +321,8 @@ class ZooKeeper < JZooKeeper
     else
       setData(path, data.to_java_bytes, version)
     end
-  rescue Exception => e
-    raise KeeperException.by_code(e.code)
+  # rescue Exception => e
+  #   raise KeeperException.by_code(e.code)
   end
 
   # Delete the node with the given path. The call will succeed if such a node exists, and the given version matches the node's version (if the given version is -1, 
@@ -512,8 +530,8 @@ class ZooKeeper < JZooKeeper
     else
       super(path, acl.collect {|acl| Zk::ACL.to_java(acl)}, version)
     end
-  rescue Exception => e
-    raise KeeperException.by_code(e.code)
+  # rescue Exception => e
+  #   raise KeeperException.by_code(e.code)
   end
 
 end

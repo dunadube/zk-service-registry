@@ -72,6 +72,11 @@ public class ZooKeeperRetry extends ZooKeeper {
         super.close();
     }
 
+    public String createWithString(String path, String data, List<ACL> acl,
+            CreateMode createMode) throws KeeperException, InterruptedException {
+      return create(path, data.getBytes(), acl, createMode);
+    }
+
     @Override
     public String create(String path, byte[] data, List<ACL> acl,
             CreateMode createMode) throws KeeperException, InterruptedException {

@@ -1,11 +1,5 @@
 require File.dirname(__FILE__) + '/../../ext/zookeeper_j/zookeeper'
 
-class ZooKeeper
-  DEFAULTS = {
-    :timeout => 10000
-  }
-  
-end
 
 require File.dirname(__FILE__) + '/zookeeper/id'
 require File.dirname(__FILE__) + '/zookeeper/permission'

@@ -35,13 +35,6 @@ describe ZK::ServiceInstance do
     @service_finder.instances.first.name.should eql("host01:port1")
   end
 
-  it "can watch for new service instances" do
-    @service_finder.watch("online_status")
-    new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
-
-    sleep 2
-    @service_finder.instances.size.should eql(2)
-  end
 
   it "can watch for removed  service instances" do
     @service_finder.watch("online_status")
@@ -51,6 +44,14 @@ describe ZK::ServiceInstance do
     sleep 2
 
     @service_finder.instances.size.should eql(1)
+  end
+
+  it "can watch for new service instances" do
+    @service_finder.watch("online_status")
+    new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
+
+    sleep 5
+    @service_finder.instances.size.should eql(2)
   end
 
   after :each do
