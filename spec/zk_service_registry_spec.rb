@@ -4,7 +4,7 @@ require File.dirname(__FILE__) + "/../lib/zk-service-registry.rb"
 describe ZK::ServiceInstance do
   before :all do
     ZookeeperTestServer.start
-    wait_until { ZookeeperTestServer.running? }
+    ZK::Utils.wait_until { ZookeeperTestServer.running? }
     sleep 2
   end
 
@@ -39,7 +39,7 @@ describe ZK::ServiceInstance do
   it "can watch for removed  service instances" do
     @service_finder.watch("online_status")
     new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
-    sleep 2
+    sleep 1
     new_instance.delete
     sleep 2
 
@@ -50,7 +50,7 @@ describe ZK::ServiceInstance do
     @service_finder.watch("online_status")
     new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
 
-    sleep 5
+    sleep 3
     @service_finder.instances.size.should eql(2)
   end
 
@@ -61,6 +61,6 @@ describe ZK::ServiceInstance do
 
   after :all do
     ZookeeperTestServer.stop
-    wait_until { !ZookeeperTestServer.running? }
+    ZK::Utils.wait_until { !ZookeeperTestServer.running? }
   end
 end

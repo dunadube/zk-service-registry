@@ -1,17 +1,27 @@
 require 'json'
 require File.dirname(__FILE__) + '/zk-service-registry/zookeeper'
 
-module ZK 
+# Default host configuration
+module ZK::Config
+  # Zookeeper Hosts: Can be a comma separated list of host and ports
+  Hosts = "localhost:2181" if !const_defined?(:Hosts)
+  
+  # Service registrations will be created under this path
   ServicePath = "/services"
+end
 
-  module Utils
-    def wait_until(timeout=10, &block)
-      time_to_stop = Time.now + timeout
-      until yield do 
-        break unless Time.now < time_to_stop
-      end
+module ZK::Utils
+
+  def self.wait_until(timeout=10, &block)
+    time_to_stop = Time.now + timeout
+    until yield do 
+      break unless Time.now < time_to_stop
     end
   end
+end
+
+module ZK 
+
 
   class Service
     attr_accessor :name, :instances
@@ -23,7 +33,7 @@ module ZK
   end
 
   class ServiceInstance
-    @hosts = "localhost:2181"
+    @hosts = ZK::Config::Hosts 
 
     attr_accessor :service_name, :name, :data 
 
@@ -38,13 +48,17 @@ module ZK
     # Factory method which advertises
     # a new service instance on zookeeper
     def self.advertise(svcname, hostport)
-      zk_service.create(:path => ZK::ServicePath, :data => "service registry") if !zk_service.exists(:path => ZK::ServicePath)
-      zk_service.create(:path => ZK::ServicePath + "/#{svcname}", :data => svcname) if !zk_service.exists(:path => ZK::ServicePath + "/#{svcname}")
+      zk_service.create(:path => ZK::Config::ServicePath, :data => "service registry root") if !zk_service.exists(:path => ZK::Config::ServicePath)
+      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}", :data => svcname) if !zk_service.exists(:path => ZK::Config::ServicePath + "/#{svcname}")
+
+      # Delete an existing registration first, otherwise
+      # Zookeeper will throw an exception creating the registration
       if exists_service?(svcname, hostport) then
         delete_service(svcname, hostport)
       end
+
       svc_inst = self.new(zk_service, svcname, hostport)
-      zk_service.create(:path => ZK::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => true) 
+      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => true) 
 
       svc_inst
     end
@@ -53,13 +67,13 @@ module ZK
     # List all currently registered services
     # in zookeeper
     def self.list_services
-      service_names = zk_service.children(:path => ZK::ServicePath)
+      service_names = zk_service.children(:path => ZK::Config::ServicePath)
       
       services = service_names.map do |svc_name|
-        service_instance_names = zk_service.children(:path => ZK::ServicePath + "/" + svc_name)
+        service_instance_names = zk_service.children(:path => ZK::Config::ServicePath + "/" + svc_name)
 
         service_instances = service_instance_names.map do |svc_inst_name|
-          res = zk_service.get(:path => ZK::ServicePath + "/" + svc_name + "/" + svc_inst_name)
+          res = zk_service.get(:path => ZK::Config::ServicePath + "/" + svc_name + "/" + svc_inst_name)
 
           ZK::ServiceInstance.new(zk_service, svc_name, svc_inst_name, res[0])
         end
@@ -82,13 +96,13 @@ module ZK
     # Mark the service as down
     def down!
       @data[:state] = :down
-      @zk.set(:path => ZK::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
+      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
     end
 
     # Mark the service as up
     def up!
       @data[:state] = :up
-      @zk.set(:path => ZK::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
+      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
     end
     
     # ===
@@ -97,18 +111,18 @@ module ZK
 
     def self.zk_service
       @zk1 =@zk1 ||  ZooKeeper.new(:host => @hosts)
-      while !@zk1.connected?
-        sleep 1
-      end
+
+      ZK::Utils.wait_until { @zk1.connected? }
+
       @zk1
     end
 
     def self.exists_service?(svcname, hostport)
-      zk_service.exists(:path => ZK::ServicePath + "/#{svcname}/#{hostport}")
+      zk_service.exists(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}")
     end
 
     def self.delete_service(svcname, hostport)
-      zk_service.delete(:path => ZK::ServicePath + "/#{svcname}/#{hostport}")
+      zk_service.delete(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}")
     end
   end
 
@@ -122,11 +136,9 @@ module ZK
   #     finder.close
   #
   class ServiceFinder
-    include Utils
-
     attr_accessor :instances
 
-    def initialize(hosts = "localhost:2181")
+    def initialize(hosts = ZK::Config::Hosts)
       @hosts = hosts 
       @instances = []
       @lock = Mutex.new
@@ -134,12 +146,12 @@ module ZK
 
     def connect
       @zk = @zk || ZooKeeper.new(:host => @hosts, :watcher => self)
-      wait_until { @zk.connected? }
+      ZK::Utils.wait_until { @zk.connected? }
       self
     end
 
     def watch(svcname)
-      path = ZK::ServicePath + "/#{svcname}"
+      path = ZK::Config::ServicePath + "/#{svcname}"
       res = @zk.children(:path => path, :watch => true)
 
       service_instances = res.collect do |svc_inst_name|
@@ -157,7 +169,7 @@ module ZK
     def close
       if @zk then
         @zk.close
-        wait_until { @zk.closed? }
+        ZK::Utils.wait_until { @zk.closed? }
         @zk = nil
       end
     end
