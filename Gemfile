@@ -4,6 +4,7 @@ source "http://rubygems.org"
 gemspec
 
 gem "rake"
+gem "zk-service-registry-server", :git => "http://github.com/dunadube/zk-service-registry-server.git"
 
 group :examples do
   gem "sinatra"

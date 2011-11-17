@@ -3,9 +3,8 @@ require File.dirname(__FILE__) + "/../lib/zk-service-registry.rb"
 
 describe ZK::ServiceInstance do
   before :all do
-    ZookeeperTestServer.start
-    ZK::Utils.wait_until { ZookeeperTestServer.running? }
-    sleep 2
+    ZK::ZookeeperServer.start
+    ZK::Utils.wait_until { ZK::ZookeeperServer.running? }
   end
 
   before :each do
@@ -60,7 +59,7 @@ describe ZK::ServiceInstance do
   end
 
   after :all do
-    ZookeeperTestServer.stop
-    ZK::Utils.wait_until { !ZookeeperTestServer.running? }
+    ZK::ZookeeperServer.stop
+    ZK::Utils.wait_until { !ZK::ZookeeperServer.running? }
   end
 end

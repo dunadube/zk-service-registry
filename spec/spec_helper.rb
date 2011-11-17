@@ -1,7 +1,7 @@
 # $LOAD_PATH << "#{File.dirname(__FILE__)}/../ext" << "#{File.dirname(__FILE__)}/../lib"
 require 'rspec'
 require 'rspec/autorun'
-require File.dirname(__FILE__) + "/../ext/zookeeper_j/zookeeper_test_server.rb"
+require 'zk-service-registry-server' 
 
 
 # method to waith until block passed returns true or timeout (default is 10 seconds) is reached 
