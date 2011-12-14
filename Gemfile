@@ -8,6 +8,7 @@ gem "zk-service-registry-server", :git => "http://github.com/dunadube/zk-service
 
 group :examples do
   gem "sinatra"
+  gem "jruby-openssl"
   gem "net-http-persistent"
 end
 
