@@ -57,7 +57,7 @@ module ZK
   end
 
 
-  class Service
+  class ServiceContainer
     attr_accessor :name, :instances
 
     def initialize(name, instances)
@@ -112,7 +112,7 @@ module ZK
           ZK::ServiceInstance.new(zk_service, svc_name, svc_inst_name, res[0])
         end
 
-        ZK::Service.new(svc_name, service_instances)
+        ZK::ServiceContainer.new(svc_name, service_instances)
       end
       services
     end
