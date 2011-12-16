@@ -1,16 +1,10 @@
 require 'rubygems'
 require 'sinatra'
-require File.dirname(__FILE__) + '/zk-register'
+require 'zk-service-registry'
 
 configure do
   settings.port = 6666
-
-  Thread.new{
-    puts "Waiting for Sinatra to get his pants on..."
-    sleep 1 until Sinatra::Application.running?
-    puts "Registering at Zookeeper server..."
-    zk_register("foo")
-  }
+  ZK::Registration.register_when("foo"){Sinatra::Application.running?}
 end
 
 get '/' do

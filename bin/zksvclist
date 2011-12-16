@@ -7,14 +7,11 @@ require 'rubygems'
 require 'bundler/setup'
 require 'zk-service-registry'
 
-def emit_header
+def show_service_listing
   service = "SERVICE".ljust(20)
   instance = "INSTANCE".ljust(25)
   data = "STATE".ljust(5)
-  puts "#{service}\t#{instance}\t#{data}" 
-end
-
-def emit_service_list
+  puts "#{service}\t#{instance}\t#{data}"
   services = ZK::ServiceInstance.list_services
   services.each do |s|
     s.instances.each do |svc_inst|
@@ -24,5 +21,25 @@ def emit_service_list
   end
 end
 
-emit_header
-emit_service_list
+def service_list
+  ZK::ServiceInstance.list_services.map{|s| {:name => s.name, :instances => s.instances.map{|i| i.name}} }
+end
+
+def continuous_service_list
+  slc = []
+  loop do
+    sl = service_list
+    if sl != slc
+      slc = sl
+      p sl
+    end
+    sleep 1
+  end
+end
+
+if "#{ARGV[0]}".downcase.strip == '-f'
+  trap('INT'){puts"\nbye!";exit}
+  continuous_service_list
+else
+  show_service_listing
+end

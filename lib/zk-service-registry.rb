@@ -1,11 +1,12 @@
 require 'json'
+require 'socket'
 require File.dirname(__FILE__) + '/zk-service-registry/zookeeper'
 
 # Default host configuration
 module ZK::Config
   # Zookeeper Hosts: Can be a comma separated list of host and ports
   Hosts = "localhost:2181" if !const_defined?(:Hosts)
-  
+
   # Service registrations will be created under this path
   ServicePath = "/services"
 end
@@ -14,13 +15,46 @@ module ZK::Utils
 
   def self.wait_until(timeout=10, &block)
     time_to_stop = Time.now + timeout
-    until yield do 
+    until yield do
       break unless Time.now < time_to_stop
     end
   end
 end
 
-module ZK 
+module ZK
+
+  class Registration
+    def self.local_ip
+      if Socket.respond_to?(:ip_address_list)
+        Socket.ip_address_list.find(&:ipv4_private?).ip_address #>=1.9.2-180
+      else
+        begin
+          orig, Socket.do_not_reverse_lookup = Socket.do_not_reverse_lookup, true  # turn off reverse DNS resolution temporarily
+          UDPSocket.open do |s|
+            s.connect '64.233.187.99', 1
+            s.addr.last
+          end
+        ensure
+          Socket.do_not_reverse_lookup = orig
+        end
+      end
+    end
+
+    def self.register(svcname)
+      ipaddr = settings.bind
+      ipaddr = local_ip if ipaddr == '0.0.0.0'
+      ZK::ServiceInstance.advertise(svcname, ipaddr + ':' + settings.port.to_s)
+    end
+
+    def self.register_when(svcname, &block)
+      Thread.new{
+        puts 'Waiting for condition before Zookeeper registration...'
+        (sleep 1 until yield) if block_given?
+        puts 'Registering at Zookeeper server...'
+        register(svcname)
+      }
+    end
+  end
 
 
   class Service
@@ -33,9 +67,9 @@ module ZK
   end
 
   class ServiceInstance
-    @hosts = ZK::Config::Hosts 
+    @hosts = ZK::Config::Hosts
 
-    attr_accessor :service_name, :name, :data 
+    attr_accessor :service_name, :name, :data
 
     def initialize(zk_inst, svcname, name, data=nil)
       @zk = zk_inst
@@ -58,7 +92,7 @@ module ZK
       end
 
       svc_inst = self.new(zk_service, svcname, hostport)
-      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => true) 
+      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => true)
 
       svc_inst
     end
@@ -68,7 +102,7 @@ module ZK
     # in zookeeper
     def self.list_services
       service_names = zk_service.children(:path => ZK::Config::ServicePath)
-      
+
       services = service_names.map do |svc_name|
         service_instance_names = zk_service.children(:path => ZK::Config::ServicePath + "/" + svc_name)
 
@@ -77,7 +111,7 @@ module ZK
 
           ZK::ServiceInstance.new(zk_service, svc_name, svc_inst_name, res[0])
         end
-       
+
         ZK::Service.new(svc_name, service_instances)
       end
       services
@@ -96,15 +130,15 @@ module ZK
     # Mark the service as down
     def down!
       @data[:state] = :down
-      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
+      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json)
     end
 
     # Mark the service as up
     def up!
       @data[:state] = :up
-      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
+      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json)
     end
-    
+
     # ===
     private
     # ===
@@ -126,7 +160,7 @@ module ZK
     end
   end
 
-  # Connect to zookeeper service registry 
+  # Connect to zookeeper service registry
   # and watch for services coming online or
   # going offline.
   # Usage:
@@ -139,7 +173,7 @@ module ZK
     attr_accessor :instances
 
     def initialize(hosts = ZK::Config::Hosts)
-      @hosts = hosts 
+      @hosts = hosts
       @instances = []
       @lock = Mutex.new
     end
@@ -198,17 +232,16 @@ module ZK
     def _process(e)
       return if e.type == Java::org.apache.zookeeper::Watcher::Event::EventType::None
 
-      # Something changed in Zookeepr so 
+      # Something changed in Zookeepr so
       # refresh the service instances
       if e.type == Java::org.apache.zookeeper::Watcher::Event::EventType::NodeChildrenChanged then
         # $LOG.debug("Children changed on " + e.path)
-        watch(e.path.split("/").last) 
+        watch(e.path.split("/").last)
       else
         # $LOG.debug("Node create/deleted on " + e.path)
-        watch(e.path.split("/")[-2]) 
+        watch(e.path.split("/")[-2])
       end
     end
 
   end
 end
-
