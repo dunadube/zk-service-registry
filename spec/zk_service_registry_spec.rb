@@ -5,6 +5,12 @@ describe ZK::ServiceInstance do
   before :all do
     ZK::ZookeeperServer.start
     ZK::Utils.wait_until { ZK::ZookeeperServer.running? }
+
+    ZK::ServiceInstance.list_services.each do |svc|
+      svc.instances.each do |inst|
+        inst.delete
+      end
+    end
   end
 
   before :each do

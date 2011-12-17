@@ -1,44 +1,12 @@
 require 'json'
-require 'socket'
+require File.dirname(__FILE__) + '/zk-service-registry/config'
+require File.dirname(__FILE__) + '/zk-service-registry/utils'
 require File.dirname(__FILE__) + '/zk-service-registry/zookeeper'
 
-# Default host configuration
-module ZK::Config
-  # Zookeeper Hosts: Can be a comma separated list of host and ports
-  Hosts = "localhost:2181" if !const_defined?(:Hosts)
-
-  # Service registrations will be created under this path
-  ServicePath = "/services"
-end
-
-module ZK::Utils
-
-  def self.wait_until(timeout=10, &block)
-    time_to_stop = Time.now + timeout
-    until yield do
-      break unless Time.now < time_to_stop
-    end
-  end
-end
-
+# ZK is the namespace for all zookeeper stuff
 module ZK
 
   class Registration
-    def self.local_ip
-      if Socket.respond_to?(:ip_address_list)
-        Socket.ip_address_list.find(&:ipv4_private?).ip_address #>=1.9.2-180
-      else
-        begin
-          orig, Socket.do_not_reverse_lookup = Socket.do_not_reverse_lookup, true  # turn off reverse DNS resolution temporarily
-          UDPSocket.open do |s|
-            s.connect '64.233.187.99', 1
-            s.addr.last
-          end
-        ensure
-          Socket.do_not_reverse_lookup = orig
-        end
-      end
-    end
 
     def self.register(svcname)
       ipaddr = settings.bind
@@ -57,7 +25,11 @@ module ZK
   end
 
 
-  class ServiceContainer
+  # A (logical) service can have multiple 
+  # instances (physical) running on different
+  # ports and hosts.
+  #
+  class Service
     attr_accessor :name, :instances
 
     def initialize(name, instances)
@@ -88,7 +60,7 @@ module ZK
       # Delete an existing registration first, otherwise
       # Zookeeper will throw an exception creating the registration
       if exists_service?(svcname, hostport) then
-        delete_service(svcname, hostport)
+        delete_service_instance(svcname, hostport)
       end
 
       svc_inst = self.new(zk_service, svcname, hostport)
@@ -112,7 +84,7 @@ module ZK
           ZK::ServiceInstance.new(zk_service, svc_name, svc_inst_name, res[0])
         end
 
-        ZK::ServiceContainer.new(svc_name, service_instances)
+        ZK::Service.new(svc_name, service_instances)
       end
       services
     end
@@ -124,7 +96,7 @@ module ZK
     # Remove the service instance from
     # zookeeper
     def delete
-      self.class.delete_service(@service_name, @name)
+      self.class.delete_service_instance(@service_name, @name)
     end
 
     # Mark the service as down
@@ -155,7 +127,7 @@ module ZK
       zk_service.exists(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}")
     end
 
-    def self.delete_service(svcname, hostport)
+    def self.delete_service_instance(svcname, hostport)
       zk_service.delete(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}")
     end
   end
