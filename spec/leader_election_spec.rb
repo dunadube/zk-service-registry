@@ -7,8 +7,12 @@ describe ZK::LeaderElection do
     ZK::ZookeeperServer.start
     ZK::Utils.wait_until { ZK::ZookeeperServer.running? }
 
+    # clear all nodes before starting
     ZK::LeaderElection.clear_all
+    # create a couple of election nodes
     @nodes = (1..3).map { |i| ZK::LeaderElection.start("redis") }
+    @leader = @nodes.select { |n| n.leader? }.first
+    @followers = @nodes.select { |n| !n.leader? }
   end
 
   after :all do
@@ -20,16 +24,22 @@ describe ZK::LeaderElection do
     @nodes.first.participants.size.should eql(3)
   end
 
-  it "should have one leader" do
-    number_of_leaders = @nodes.inject(0) do |sum, n|
-      if n.leader?
-        sum + 1
-      else 
-        sum
-      end
-    end
+  it "should have a leader who does not follow" do
+    @leader.following.should eql(nil)
+  end
 
-    number_of_leaders.should eql(1)
+  it "should have followers who follow someone" do
+    @followers.size.should eql(2)
+    @followers.each { |f| f.following.should_not eql(nil) }
+  end
+
+  it "should do something if the leader fails" do
+    become_leader = false
+    @followers.first.on_become_leader { become_leader = true }
+    @leader.close
+    sleep 2
+
+    become_leader.should eql(true)
   end
 
 end
