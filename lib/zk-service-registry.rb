@@ -2,6 +2,7 @@ require 'json'
 require File.dirname(__FILE__) + '/zk-service-registry/config'
 require File.dirname(__FILE__) + '/zk-service-registry/utils'
 require File.dirname(__FILE__) + '/zk-service-registry/zookeeper'
+require File.dirname(__FILE__) + '/zk-service-registry/leader_election'
 
 # ZK is the namespace for all zookeeper stuff
 module ZK

@@ -6,6 +6,8 @@ describe ZK::ServiceInstance do
     ZK::ZookeeperServer.start
     ZK::Utils.wait_until { ZK::ZookeeperServer.running? }
 
+    # make sure there are no
+    # services registered
     ZK::ServiceInstance.list_services.each do |svc|
       svc.instances.each do |inst|
         inst.delete
