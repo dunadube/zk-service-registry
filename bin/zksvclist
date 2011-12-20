@@ -35,6 +35,7 @@ def show_service_listing
   out
 end
 
+puts "Using ZooKeeper on #{ZK::Config::Hosts}"
 if "#{ARGV[0]}".downcase.strip == '-f'
   last = "" 
   loop do
