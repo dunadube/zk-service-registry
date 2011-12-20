@@ -1,28 +1,35 @@
 require 'json'
+require File.dirname(__FILE__) + '/zk-service-registry/config'
+require File.dirname(__FILE__) + '/zk-service-registry/utils'
 require File.dirname(__FILE__) + '/zk-service-registry/zookeeper'
+require File.dirname(__FILE__) + '/zk-service-registry/leader_election'
 
-# Default host configuration
-module ZK::Config
-  # Zookeeper Hosts: Can be a comma separated list of host and ports
-  Hosts = "localhost:2181" if !const_defined?(:Hosts)
-  
-  # Service registrations will be created under this path
-  ServicePath = "/services"
-end
+# ZK is the namespace for all zookeeper stuff
+module ZK
 
-module ZK::Utils
+  class Registration
 
-  def self.wait_until(timeout=10, &block)
-    time_to_stop = Time.now + timeout
-    until yield do 
-      break unless Time.now < time_to_stop
+    def self.register(svcname)
+      ipaddr = settings.bind
+      ipaddr = local_ip if ipaddr == '0.0.0.0'
+      ZK::ServiceInstance.advertise(svcname, ipaddr + ':' + settings.port.to_s)
+    end
+
+    def self.register_when(svcname, &block)
+      Thread.new{
+        puts 'Waiting for condition before Zookeeper registration...'
+        (sleep 1 until yield) if block_given?
+        puts 'Registering at Zookeeper server...'
+        register(svcname)
+      }
     end
   end
-end
-
-module ZK 
 
 
+  # A (logical) service can have multiple 
+  # instances (physical) running on different
+  # ports and hosts.
+  #
   class Service
     attr_accessor :name, :instances
 
@@ -33,9 +40,9 @@ module ZK
   end
 
   class ServiceInstance
-    @hosts = ZK::Config::Hosts 
+    @hosts = ZK::Config::Hosts
 
-    attr_accessor :service_name, :name, :data 
+    attr_accessor :service_name, :name, :data
 
     def initialize(zk_inst, svcname, name, data=nil)
       @zk = zk_inst
@@ -54,11 +61,11 @@ module ZK
       # Delete an existing registration first, otherwise
       # Zookeeper will throw an exception creating the registration
       if exists_service?(svcname, hostport) then
-        delete_service(svcname, hostport)
+        delete_service_instance(svcname, hostport)
       end
 
       svc_inst = self.new(zk_service, svcname, hostport)
-      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => true) 
+      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => true)
 
       svc_inst
     end
@@ -68,7 +75,7 @@ module ZK
     # in zookeeper
     def self.list_services
       service_names = zk_service.children(:path => ZK::Config::ServicePath)
-      
+
       services = service_names.map do |svc_name|
         service_instance_names = zk_service.children(:path => ZK::Config::ServicePath + "/" + svc_name)
 
@@ -77,7 +84,7 @@ module ZK
 
           ZK::ServiceInstance.new(zk_service, svc_name, svc_inst_name, res[0])
         end
-       
+
         ZK::Service.new(svc_name, service_instances)
       end
       services
@@ -90,21 +97,21 @@ module ZK
     # Remove the service instance from
     # zookeeper
     def delete
-      self.class.delete_service(@service_name, @name)
+      self.class.delete_service_instance(@service_name, @name)
     end
 
     # Mark the service as down
     def down!
       @data[:state] = :down
-      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
+      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json)
     end
 
     # Mark the service as up
     def up!
       @data[:state] = :up
-      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json) 
+      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json)
     end
-    
+
     # ===
     private
     # ===
@@ -121,12 +128,12 @@ module ZK
       zk_service.exists(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}")
     end
 
-    def self.delete_service(svcname, hostport)
+    def self.delete_service_instance(svcname, hostport)
       zk_service.delete(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}")
     end
   end
 
-  # Connect to zookeeper service registry 
+  # Connect to zookeeper service registry
   # and watch for services coming online or
   # going offline.
   # Usage:
@@ -139,7 +146,7 @@ module ZK
     attr_accessor :instances
 
     def initialize(hosts = ZK::Config::Hosts)
-      @hosts = hosts 
+      @hosts = hosts
       @instances = []
       @lock = Mutex.new
     end
@@ -198,17 +205,16 @@ module ZK
     def _process(e)
       return if e.type == Java::org.apache.zookeeper::Watcher::Event::EventType::None
 
-      # Something changed in Zookeepr so 
+      # Something changed in Zookeepr so
       # refresh the service instances
       if e.type == Java::org.apache.zookeeper::Watcher::Event::EventType::NodeChildrenChanged then
         # $LOG.debug("Children changed on " + e.path)
-        watch(e.path.split("/").last) 
+        watch(e.path.split("/").last)
       else
         # $LOG.debug("Node create/deleted on " + e.path)
-        watch(e.path.split("/")[-2]) 
+        watch(e.path.split("/")[-2])
       end
     end
 
   end
 end
-
