@@ -43,8 +43,6 @@ module ZK
   end
 
   class ServiceInstance
-    @hosts = ZK::Config::Hosts
-
     attr_accessor :service_name, :name, :data
 
     def initialize(zk_inst, svcname, name, data=nil)
@@ -121,7 +119,7 @@ module ZK
     # ===
 
     def self.zk_service
-      @zk1 =@zk1 ||  ZooKeeper.new(:host => @hosts)
+      @zk1 =@zk1 ||  ZooKeeper.new(:host => ZK::Config::Hosts)
 
       ZK::Utils.wait_until { @zk1.connected? }
 
