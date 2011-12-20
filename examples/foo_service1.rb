@@ -3,8 +3,9 @@ require 'sinatra'
 require 'zk-service-registry'
 
 configure do
-  settings.port = 7777
-  ZK::Registration.register_when("foo"){Sinatra::Application.running?}
+  ZK::Registration.register_deferred("foo", settings.bind, settings.port=6666) do
+    Sinatra::Application.running?
+  end
 end
 
 get '/' do

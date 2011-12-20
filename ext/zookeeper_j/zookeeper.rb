@@ -535,3 +535,5 @@ class ZooKeeper < JZooKeeper
   end
 
 end
+
+require File.dirname(__FILE__) + '/zookeeper_ext'

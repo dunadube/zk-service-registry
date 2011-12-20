@@ -1,38 +1,10 @@
-#
-# Add some convenience methods
-#
-class ZooKeeper
-
-  #
-  # Force create a path
-  #
-  def mkdir_p(path)
-    path.split("/").slice(1..-1).inject("") do |current_path, part|
-      current_path =  current_path + "/" + part
-
-      create(:path => current_path, :data => "") if !exists(:path => current_path)
-
-      current_path
-    end
-  end
-
-  #
-  # Delete a path recursively
-  #
-  def rm_r(path)
-    return if !exists path
-
-    children(path).each do |c|
-      rm_r(path + "/" + c)
-    end
-    delete(path) 
-  end
-end
-
 module ZK
 
   LeaderElectionRoot = "/leader_election"
 
+  # 
+  # Performs a leader/follower election
+  #
   class LeaderElection
 
     # 
@@ -61,6 +33,7 @@ module ZK
       @on_become_leader_fns = []
     end
 
+    # Connect to Zookeeper
     def connect
       @zk = @zk || ZooKeeper.new(:host => @hosts, :watcher => self)
       ZK::Utils.wait_until { @zk.connected? }
@@ -71,10 +44,15 @@ module ZK
       self
     end
 
+    # Delete the election node
     def close
       @zk.delete(@my_path) if @my_path 
     end
 
+    # Creates a sequence, ephemeral node under the elcetion_path using
+    # the local ip address as the node name.
+    # Zookeeper will return the full path and append a sequence number.
+    # The node with the smallest sequence number is the leader.
     def elect
       # ZK will create the specified path and append a sequence number
      @my_path = @zk.create(:path => "#{@election_path}/#{@elector_name}_", :data => "", :ephemeral => true, :sequence => true)
@@ -96,7 +74,7 @@ module ZK
     end
 
     # Return all paths of all participants in
-    # the election
+    # the election and sort by sequence numbers.
     def participants
       # NOTE: You have to sort by sequence id yourself
       #   ZooKeeper won't do that

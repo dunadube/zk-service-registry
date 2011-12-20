@@ -3,43 +3,48 @@
 # the zookeeper service registry
 $:.unshift File.join(File.dirname(__FILE__), *%w[.. lib])
 
-require 'rubygems'
-require 'bundler/setup'
+begin
+  require 'rubygems'
+  require 'bundler/setup'
+rescue LoadError
+  require 'rubygems'
+end
 require 'zk-service-registry'
+begin
+require 'zk-service-registry-config'
+rescue LoadError
+end
 
 def show_service_listing
+  out = ""
   service = "SERVICE".ljust(20)
   instance = "INSTANCE".ljust(25)
   data = "STATE".ljust(5)
-  puts "#{service}\t#{instance}\t#{data}"
+
+  # headline
+  out << "#{service}\t#{instance}\t#{data}\n"
+
+  # generate service list output
   services = ZK::ServiceInstance.list_services
   services.each do |s|
     s.instances.each do |svc_inst|
       state = svc_inst.data[:state] if svc_inst.data
-      puts "#{s.name.ljust(20)}\t#{svc_inst.name.ljust(25)}\t#{state.ljust(5)}"
+      out << "#{s.name.ljust(20)}\t#{svc_inst.name.ljust(25)}\t#{state.ljust(5)}\n"
     end
   end
-end
-
-def service_list
-  ZK::ServiceInstance.list_services.map{|s| {:name => s.name, :instances => s.instances.map{|i| i.name}} }
-end
-
-def continuous_service_list
-  slc = []
-  loop do
-    sl = service_list
-    if sl != slc
-      slc = sl
-      p sl
-    end
-    sleep 1
-  end
+  out
 end
 
 if "#{ARGV[0]}".downcase.strip == '-f'
-  trap('INT'){puts"\nbye!";exit}
-  continuous_service_list
+  last = "" 
+  loop do
+    current = show_service_listing
+    if current != last then
+      puts current
+      last = current
+    end
+    sleep 1
+  end
 else
-  show_service_listing
+  puts show_service_listing
 end
