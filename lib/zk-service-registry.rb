@@ -74,7 +74,8 @@ module ZK
     # List all currently registered services
     # in zookeeper
     def self.list_services
-      service_names = zk_service.children(:path => ZK::Config::ServicePath)
+      service_names = []
+      service_names = zk_service.children(:path => ZK::Config::ServicePath) if zk_service.exists(ZK::Config::ServicePath)
 
       services = service_names.map do |svc_name|
         service_instance_names = zk_service.children(:path => ZK::Config::ServicePath + "/" + svc_name)

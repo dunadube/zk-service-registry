@@ -20,10 +20,12 @@ class ZooKeeper
   # Delete a path recursively
   #
   def rm_r(path)
+    return if !exists path
+
     children(path).each do |c|
       rm_r(path + "/" + c)
     end
-    delete(path)
+    delete(path) 
   end
 end
 
