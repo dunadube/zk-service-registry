@@ -7,7 +7,7 @@
 module ZK
   class Config
     # Zookeeper Hosts: Can be a comma separated list of host and ports
-    Hosts = "localhost:2181" if !const_defined?(:Hosts)
+    Hosts = ["localhost:2181"] if !const_defined?(:Hosts)
 
     # Service registrations will be created under this path
     ServicePath = "/services"

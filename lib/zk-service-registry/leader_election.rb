@@ -11,7 +11,7 @@ module ZK
     # Delete the election tree
     #
     def self.clear_all
-      zk = ZooKeeper.new(:host => ZK::Config::Hosts)
+      zk = ZooKeeper.new(:host => ZK::Config::Hosts.join(","))
       ZK::Utils.wait_until { zk.connected? }
       zk.rm_r(LeaderElectionRoot)
     end
@@ -27,7 +27,7 @@ module ZK
     end
 
     def initialize(service_name)
-      @hosts = ZK::Config::Hosts
+      @hosts = ZK::Config::Hosts.join(",")
       @election_path = "#{LeaderElectionRoot}/#{service_name}"
       @elector_name = ZK::Utils.local_ip
       @on_become_leader_fns = []

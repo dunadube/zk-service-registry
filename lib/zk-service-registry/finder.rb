@@ -12,7 +12,7 @@ module ZK
   class ServiceFinder
     attr_accessor :instances
 
-    def initialize(hosts = ZK::Config::Hosts)
+    def initialize(hosts = ZK::Config::Hosts.join(","))
       @hosts = hosts
       @instances = []
       @lock = Mutex.new

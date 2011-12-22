@@ -119,7 +119,7 @@ module ZK
     # ===
 
     def self.zk_service
-      @zk1 =@zk1 ||  ZooKeeper.new(:host => ZK::Config::Hosts)
+      @zk1 =@zk1 ||  ZooKeeper.new(:host => ZK::Config::Hosts.join(","))
 
       ZK::Utils.wait_until { @zk1.connected? }
 
