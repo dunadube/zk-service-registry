@@ -11,10 +11,16 @@ rescue LoadError
 end
 require 'zk-service-registry'
 begin
-require 'zk-service-registry-config'
+  # load FriendScout24 config
+  require 'zk-service-registry-config'
 rescue LoadError
 end
+require 'optparse'
 
+# 
+# Return a list of registered services in
+# an easy to parse table format
+#
 def show_service_listing
   out = ""
   service = "SERVICE".ljust(20)
@@ -35,8 +41,19 @@ def show_service_listing
   out
 end
 
-puts "Using ZooKeeper on #{ZK::Config::Hosts}"
-if "#{ARGV[0]}".downcase.strip == '-f'
+# Parse the command line parameters
+options = {}
+optparse = OptionParser.new do|opts|
+  opts.banner = "Usage: zksvclist [-c]"
+  opts.on("-c", "run in a loop and list services continuously") do
+    options[:continuous] = true
+  end
+
+end
+optparse.parse!
+
+puts "Connecting to Zookeeper at #{ZK::Config::Hosts} (environment=#{ENV['RACK_ENV']})"
+if options[:continuous] 
   last = "" 
   loop do
     current = show_service_listing
