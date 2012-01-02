@@ -128,6 +128,13 @@ module ZK
       services
     end
 
+    #  
+    # Remove the entry for the service completely
+    #
+    def self.clear_service(svcname)
+      zk_service.rm_r(ZK::Config::ServicePath + "/" + svcname)
+    end
+
     # ===
     # instance methods
     # ===

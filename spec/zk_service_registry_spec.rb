@@ -36,6 +36,10 @@ describe ZK::ServiceInstance do
       @service_finder = ZK::ServiceFinder.new.connect
     end
 
+    after(:all) do
+      ZK::ServiceInstance.clear_service(@service_name)
+    end
+
     subject do
       @dynamic_service
     end
@@ -90,6 +94,10 @@ describe ZK::ServiceInstance do
 
       @rabbitmq_finder = ZK::ServiceFinder.new.connect
       @rabbitmq_finder.watch("rabbitmq")
+    end
+
+    after(:all) do
+      ZK::ServiceInstance.clear_service("rabbitmq")
     end
 
     subject do
