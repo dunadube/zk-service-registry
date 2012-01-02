@@ -42,6 +42,9 @@ module ZK
     end
   end
 
+  # ServiceInstance is the class to use
+  # if you want to register services with
+  # Zookeeper
   class ServiceInstance
     attr_accessor :service_name, :name, :data
 
@@ -53,11 +56,23 @@ module ZK
       @data = JSON.parse(data,:symbolize_names => true) if data && !data.empty?
     end
 
-    # Factory method which advertises
-    # a new service instance on zookeeper
+    #
+    # Registers a service instance with Zookeeper using ephemeral nodes
+    # which means the registration will decay after a timeout period
+    # if the registering client looses connection to Zookeeper.
+    #
+    # # Parameters
+    # * svcname: the servicename under which the instance will be registered
+    # * hostport: a String containing the host (ip address) and port 
+    #     under which the instance can be reached
+    #
+    # # Example
+    #     # Register an instance of service 'online-status' running on host biz01 
+    #     # listening on port 12345
+    #     ServiceInstance.advertise("online-status", "biz01:12345")
+    #
     def self.advertise(svcname, hostport)
-      zk_service.create(:path => ZK::Config::ServicePath, :data => "service registry root") if !zk_service.exists(:path => ZK::Config::ServicePath)
-      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}", :data => svcname) if !zk_service.exists(:path => ZK::Config::ServicePath + "/#{svcname}")
+      prepare_dir_structure(svcname)
 
       # Delete an existing registration first, otherwise
       # Zookeeper will throw an exception creating the registration
@@ -71,9 +86,30 @@ module ZK
       svc_inst
     end
 
+    #
+    # Like advertise but instead of an ephemeral node a persistent node will be used, i. e. the
+    # service registration will persist if the registering client looses connection or 
+    # regularly disconnects from Zookeeper.
+    #
+    def self.register(svcname, hostport)
+      prepare_dir_structure(svcname)
 
-    # List all currently registered services
-    # in zookeeper
+      # Delete an existing registration first, otherwise
+      # Zookeeper will throw an exception creating the registration
+      if exists_service?(svcname, hostport) then
+        delete_service_instance(svcname, hostport)
+      end
+
+      svc_inst = self.new(zk_service, svcname, hostport)
+      zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => false)
+
+      svc_inst
+    end
+
+
+    #
+    # List all currently registered services in zookeeper
+    #
     def self.list_services
       service_names = []
       service_names = zk_service.children(:path => ZK::Config::ServicePath) if zk_service.exists(ZK::Config::ServicePath)
@@ -105,12 +141,16 @@ module ZK
     # Mark the service as down
     def down!
       @data[:state] = :down
-      @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json)
+      save!
     end
 
     # Mark the service as up
     def up!
       @data[:state] = :up
+      save!
+    end
+
+    def save!
       @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json)
     end
 
@@ -132,6 +172,12 @@ module ZK
 
     def self.delete_service_instance(svcname, hostport)
       zk_service.delete(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}")
+    end
+    
+    # Prepare the service registration 'directory' layout in 
+    # Zookeeper
+    def self.prepare_dir_structure(svcname)
+      zk_service.mkdir_p(ZK::Config::ServicePath + "/#{svcname}")
     end
   end
 

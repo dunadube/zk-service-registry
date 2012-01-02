@@ -13,61 +13,104 @@ describe ZK::ServiceInstance do
         inst.delete
       end
     end
-  end
 
-  before :each do
-    @svc_instance = ZK::ServiceInstance.advertise("online_status", "host01:port1")
-    @service_finder = ZK::ServiceFinder.new.connect
-  end
-
-  it "can advertise a service and a service instance" do
-    services = ZK::ServiceInstance.list_services
-
-    services.size.should eql(1)
-    services.first.instances.size.should eql(1)
-    services.first.should be_a_kind_of(ZK::Service)
-    services.first.instances.first.name.should eql("host01:port1")
-  end
-
-  it "can flag a service instance as up/down" do
-    @svc_instance.down! 
-    services = ZK::ServiceInstance.list_services
-    services.first.instances.first.data[:state].should eql("down")
-  end
-
-  it "can lookup a service/service instance" do
-    @service_finder.watch("online_status")
-
-    @service_finder.instances.size.should eql(1)
-    @service_finder.instances.first.name.should eql("host01:port1")
-  end
-
-
-  it "can watch for removed  service instances" do
-    @service_finder.watch("online_status")
-    new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
-    sleep 1
-    new_instance.delete
-    sleep 2
-
-    @service_finder.instances.size.should eql(1)
-  end
-
-  it "can watch for new service instances" do
-    @service_finder.watch("online_status")
-    new_instance = ZK::ServiceInstance.advertise("online_status", "host02:port2")
-
-    sleep 3
-    @service_finder.instances.size.should eql(2)
-  end
-
-  after :each do
-    @svc_instance.delete if @svc_instance
-    @service_finder.close if @service_finder
   end
 
   after :all do
     ZK::ZookeeperServer.stop
     ZK::Utils.wait_until { !ZK::ZookeeperServer.running? }
   end
+
+  def service_from_list(svcname)
+    ZK::ServiceInstance.list_services.select { |svc| svc.name == svcname }.first
+  end
+
+  # ############################################
+  # TESTS start here
+  # ############################################
+  context "advertising dynamic services (i. e. they may come and go at any time)" do
+
+    before(:all) do
+      @service_name = "online-status"
+      @dynamic_service = ZK::ServiceInstance.advertise(@service_name, "host01:port1")
+      @service_finder = ZK::ServiceFinder.new.connect
+    end
+
+    subject do
+      @dynamic_service
+    end
+
+    it "can advertise a service and a service instance" do
+      service = service_from_list(@service_name)
+
+      service.instances.size.should eql(1)
+      service.should be_a_kind_of(ZK::Service)
+      service.instances.first.name.should eql("host01:port1")
+    end
+
+    it "can flag a service instance as up/down" do
+      @dynamic_service.down! 
+      service = service_from_list(@service_name)
+      service.instances.first.data[:state].should eql("down")
+    end
+
+    it "can lookup a service/service instance" do
+      @service_finder.watch(@service_name)
+
+      @service_finder.instances.size.should eql(1)
+      @service_finder.instances.first.name.should eql("host01:port1")
+    end
+
+
+    it "can watch for removed  service instances" do
+      @service_finder.watch(@service_name)
+      new_instance = ZK::ServiceInstance.advertise(@service_name, "host02:port2")
+      sleep 1
+      new_instance.delete
+      sleep 2
+
+      @service_finder.instances.size.should eql(1)
+    end
+
+    it "can watch for new service instances" do
+      @service_finder.watch(@service_name)
+      new_instance = ZK::ServiceInstance.advertise(@service_name, "host02:port2")
+
+      sleep 3
+      @service_finder.instances.size.should eql(2)
+    end
+  end
+
+  context "register static services (for infrastructure like dbs, caches, MOM)"do
+    before(:all) do
+      @static_service = ZK::ServiceInstance.register("rabbitmq", "host01:port1")
+      @static_service.data[:user] = "user"
+      @static_service.data[:pass] = "seekrit"
+      @static_service.save!
+
+      @rabbitmq_finder = ZK::ServiceFinder.new.connect
+      @rabbitmq_finder.watch("rabbitmq")
+    end
+
+    subject do
+      @static_service
+    end
+
+    it "registered one instance of the static service" do
+      @rabbitmq_finder.instances.size.should eql(1)
+    end
+
+    it "set all the metadata for the service instance" do
+      @rabbitmq_finder.instances.first.data[:user].should eql("user")
+      @rabbitmq_finder.instances.first.data[:pass].should eql("seekrit")
+    end
+
+    it "can change the metadata" do
+      @static_service.data[:user] = "user_changed"
+      @static_service.save!
+      sleep 1
+      @rabbitmq_finder.instances.first.data[:user].should eql("user_changed")
+    end
+  end
+
 end
