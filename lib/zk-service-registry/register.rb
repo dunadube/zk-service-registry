@@ -101,6 +101,7 @@ module ZK
       end
 
       svc_inst = self.new(zk_service, svcname, hostport)
+      svc_inst.data[:static] = true
       zk_service.create(:path => ZK::Config::ServicePath + "/#{svcname}/#{hostport}", :data => svc_inst.data.to_json, :ephemeral => false)
 
       svc_inst
@@ -133,6 +134,14 @@ module ZK
     #
     def self.clear_service(svcname)
       zk_service.rm_r(ZK::Config::ServicePath + "/" + svcname)
+    end
+
+    # 
+    # Remove a service instance entry.
+    # The service and instance path must be given (e. g. foo/bar:12345 , 
+    # where foo is the service name and bar:12345 the instance name)
+    def self.unregister_instance(service_and_instance)
+      zk_service.rm_r(ZK::Config::ServicePath + "/" + service_and_instance)
     end
 
     # ===
