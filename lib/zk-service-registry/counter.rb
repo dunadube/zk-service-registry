@@ -42,10 +42,14 @@ class ZK::Counter
     self
   end
 
+  def subcategories
+    @zk.children(@counter_category_path)
+  end
+
   private
 
   def count_all
-    @zk.children(@counter_category_path).inject(0) do  |sum, who|
+    subcategories.inject(0) do  |sum, who|
       sum += count(who)
       sum
     end

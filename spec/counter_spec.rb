@@ -32,4 +32,8 @@ describe ZK::Counter do
     @counter_sum.count.should eql(4)
   end
 
+  it "should give all the count subcategory names" do
+    @counter_sum.subcategories.should eql(["foo", "bar"])
+  end
+
 end
