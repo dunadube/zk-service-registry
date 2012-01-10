@@ -104,6 +104,10 @@ describe ZK::ServiceInstance do
       @static_service
     end
 
+    it "the instance should have metadata and a modification time" do
+      subject.meta.last_modified_time.should_not eql(0)
+    end
+
     it "registered one instance of the static service" do
       @rabbitmq_finder.instances.size.should eql(1)
     end

@@ -166,8 +166,15 @@ module ZK
       save!
     end
 
+    # Save instance data to Zookeeper
     def save!
       @zk.set(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}", :data => @data.to_json)
+    end
+
+    # Return all node data from Zookeeper
+    def meta
+      data,stat = @zk.get(:path => ZK::Config::ServicePath + "/#{@service_name}/#{@name}")
+      stat
     end
 
     # ===
