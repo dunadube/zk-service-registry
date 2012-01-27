@@ -16,7 +16,7 @@ module ZK::Utils
   #
   def self.local_ip
     require 'socket'
-    Socket.ip_address_list.find(&:ipv4_private?).ip_address if Socket.respond_to?(:ip_address_list) #>=1.9.2-180
+    return Socket.ip_address_list.find(&:ipv4_private?).ip_address if Socket.respond_to?(:ip_address_list) #>=1.9.2-180
 
     begin
       orig, Socket.do_not_reverse_lookup = Socket.do_not_reverse_lookup, true  # turn off reverse DNS resolution temporarily
